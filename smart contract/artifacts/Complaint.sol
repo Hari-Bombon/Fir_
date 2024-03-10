@@ -9,6 +9,21 @@ contract Complaint {
     uint256[] public pendingResolutions;
     uint256[] public resolvedCases;
 
+    struct ComplaintData {
+        string title;
+        string description;
+        string[] evidence;
+        string approvalRemark;
+        string resolutionRemark;
+        bool isApproved;
+        bool isResolved;
+        bool exists;
+    }
+
+    mapping(uint256 => ComplaintData) public Complaints;
+
+    event complaintFiled(uint256 id, address complaintRegisteredBy, string title);
+
     constructor(address _officer) {
         owner = msg.sender;
         officer = _officer;
@@ -31,29 +46,10 @@ contract Complaint {
         _;
     }
 
-    struct complaint {
-        uint256 id;
-        address complaintRegisteredBy;
-        string title;
-        string description;
-        string approvalRemark;
-        string resolutionRemark;
-        bool isApproved;
-        bool isResolved;
-        bool exists;
-    }
-    mapping(uint256 => complaint) public Complaints;
-
-    event complaintFiled(
-        uint256 id,
-        address complaintRegisteredBy,
-        string title
-    );
-
     function fileComplaint(string memory _title, string memory _description)
         public
     {
-        complaint storage newComplaint = Complaints[nextId];
+        ComplaintData storage newComplaint = Complaints[nextId];
         newComplaint.id = nextId;
         newComplaint.complaintRegisteredBy = msg.sender;
         newComplaint.title = _title;
@@ -65,6 +61,16 @@ contract Complaint {
         newComplaint.exists = true;
         emit complaintFiled(nextId, msg.sender, _title);
         nextId++;
+    }
+
+    function uploadEvidence(uint256 _id, string memory[] calldata _evidence)
+        public
+    {
+        require(
+            Complaints[_id].exists == true,
+            "This complaint id does not exist"
+        );
+        Complaints[_id].evidence.push(_evidence);
     }
 
     function approveComplaint(uint256 _id, string memory _approvalRemark)
@@ -115,48 +121,7 @@ contract Complaint {
             "Complaint is not yet approved"
         );
         require(
-            Complaints[_id].isResolved == false,
-            "Complaint is already resolved"
-        );
-        Complaints[_id].isResolved = true;
-        Complaints[_id].resolutionRemark = _resolutionRemark;
-    }
-
-    function calcPendingApprovalIds() public {
-        delete pendingApprovals;
-        for (uint256 i = 1; i < nextId; i++) {
-            if (
-                Complaints[i].isApproved == false &&
-                Complaints[i].exists == true
-            ) {
-                pendingApprovals.push(Complaints[i].id);
-            }
-        }
-    }
-
-    function calcPendingResolutionIds() public {
-        delete pendingResolutions;
-        for (uint256 i = 1; i < nextId; i++) {
-            if (
-                Complaints[i].isResolved == false &&
-                Complaints[i].isApproved == true &&
-                Complaints[i].exists == true
-            ) {
-                pendingResolutions.push(Complaints[i].id);
-            }
-        }
-    }
-
-    function calcResolvedIds() public {
-        delete resolvedCases;
-        for (uint256 i = 1; i < nextId; i++) {
-            if (Complaints[i].isResolved == true) {
-                resolvedCases.push(Complaints[i].id);
-            }
-        }
-    }
-
-    function setOfficerAddress(address _officer) public onlyOwner {
-        officer = _officer;
+            Complaints[_id].isResolved == false
+        )
     }
 }
