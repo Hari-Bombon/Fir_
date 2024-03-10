@@ -8,7 +8,7 @@ if (ethereum) {
   isBrowser().web3 = new Web3(ethereum);
   isBrowser().web3 = new Web3(isBrowser().web3.currentProvider);
 }
-const CONTRACT_ADDRESSES = "0xEe59De6B7A3a94D8941DD5bCe0DA5294D9eB5694";
+const CONTRACT_ADDRESSES = "0x57522181AF27696FEbDb8955fefb4d5729F6897B";
 
 export const Filecomplaint = async ({ title, description, ipfsHash }) => {
   console.log("initializing contract");
