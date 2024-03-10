@@ -1,4 +1,4 @@
-import '../styles/global.css';
+import "../styles/global.css";
 import { ChainId, ThirdwebProvider } from "@thirdweb-dev/react";
 import { Toaster } from "react-hot-toast";
 
@@ -8,7 +8,7 @@ function MyApp({ Component, pageProps }) {
       <Component {...pageProps} />
       <Toaster />
     </ThirdwebProvider>
-  )
+  );
 }
 
-export default MyApp
+export default MyApp;

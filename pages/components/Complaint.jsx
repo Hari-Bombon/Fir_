@@ -1,34 +1,60 @@
-import React, { useState } from 'react';
-import { useContract, useContractRead, useContractWrite } from "@thirdweb-dev/react";
+import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { ThirdwebSDK } from "@thirdweb-dev/sdk";
+import axios from "axios";
+import { Filecomplaint, getNextID } from "@/config/BlockchainServices";
 
 const Complaint = () => {
   const [title, setTitle] = useState("");
+  const [nextId, setNextId] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
 
-  const { contract } = useContract(process.env.NEXT_PUBLIC_SMART_CONTRACT);
+  useEffect(() => {
+    async function getnextIdfunction() {
+      const data = await getNextID();
+      setNextId(data);
+    }
 
-  const { data: nextId } = useContractRead(contract, "nextId")
-  const { mutateAsync: fileComplaint } = useContractWrite(contract, "fileComplaint");
+    getnextIdfunction();
+  }, []);
 
-  const sdk = new ThirdwebSDK("mumbai", {
-    clientId: "4752b129f7224f9d1c9e87d3850b4767",
-  });
+  const pinFileToIPFS = async (fileToPin) => {
+    const url = `https://api.pinata.cloud/pinning/pinFileToIPFS`;
+    let data = new FormData();
+    data.append("file", fileToPin);
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    const res = await axios.post(url, data, {
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${data._boundary}`,
+        pinata_api_key: "ce71e94313750493ab7d",
+        pinata_secret_api_key:
+          "9c91a7ae7c1e945e345ac3de1a3b6b7a984534c92abfb504160b411429f5afcb",
+      },
+    });
+    console.log("hash", res.data.ipfsHash);
+    return res.data.IpfsHash;
   };
 
   const handleComplaint = async () => {
+    if (!file) {
+      toast.error("Please upload a file.");
+      return;
+    }
+
     const notification = toast.loading("Filing Complaint");
     try {
-      const data = await fileComplaint([title, description, file]);
+      // First, upload the file to IPFS via Pinata
+      const ipfsHash = await pinFileToIPFS(file);
+      console.log("ipfshash", title, description, ipfsHash);
+      // Then, call your smart contract function with the IPFS hash
+      const data = await Filecomplaint({ title, description, ipfsHash });
+
       toast.success(`Complaint Filed! Note Your ComplaintId:${nextId}`, {
         id: notification,
       });
-      console.info("contract call successs", data);
+
+      console.info("Contract call success", data);
       setTitle("");
       setDescription("");
       setFile(null);
@@ -36,31 +62,55 @@ const Complaint = () => {
       toast.error("Whoops, something went wrong!", {
         id: notification,
       });
-      console.error("contract call failure", err);
+      console.error("Contract call failure", err);
     }
   };
 
-  return (
-    <div className='complaint-container md: mr-[50px] md:ml-[50px]'>
-        <p className="complaint-title-red">File Your Complaint Here:</p>
-        <div className='md:flex items-center'>
-            <p className='complaint-text-margin'>Title: </p>
-            <input type="text" className='container-input md:w-[500px] w-[300px]' placeholder='Enter Title Here'
-                onChange={(e) => { setTitle(e.target.value) }} />
-        </div>
-        <div className='md:flex items-center'>
-            <p className='complaint-text-normal'>Description: </p>
-            <input type="text" className='container-input md:w-[500px] w-[300px]' placeholder='Enter Description Here'
-                onChange={(e) => { setDescription(e.target.value) }} />
-        </div>
-        <div className='md:flex items-center'>
-            <p className='complaint-text-normal'>Upload File: </p>
-            <input type="file" className='container-input md:w-[500px] w-[300px]'
-                onChange={handleFileChange} />
-        </div>
-        <button className="button-common hover:bg-blue-900" onClick={handleComplaint}>File Complaint</button>
-    </div>
-  )
-}
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
 
-export default Complaint
+  return (
+    <div className="complaint-container md: mr-[50px] md:ml-[50px]">
+      <p className="complaint-title-red">File Your Complaint Here:</p>
+      <div className="md:flex items-center">
+        <p className="complaint-text-margin">Title: </p>
+        <input
+          type="text"
+          className="container-input md:w-[500px] w-[300px]"
+          placeholder="Enter Title Here"
+          onChange={(e) => {
+            setTitle(e.target.value);
+          }}
+        />
+      </div>
+      <div className="md:flex items-center">
+        <p className="complaint-text-normal">Description: </p>
+        <input
+          type="text"
+          className="container-input md:w-[500px] w-[300px]"
+          placeholder="Enter Description Here"
+          onChange={(e) => {
+            setDescription(e.target.value);
+          }}
+        />
+      </div>
+      <div className="md:flex items-center">
+        <p className="complaint-text-normal">Upload File: </p>
+        <input
+          type="file"
+          className="container-input md:w-[500px] w-[300px]"
+          onChange={handleFileChange}
+        />
+      </div>
+      <button
+        className="button-common hover:bg-blue-900"
+        onClick={handleComplaint}
+      >
+        File Complaint
+      </button>
+    </div>
+  );
+};
+
+export default Complaint;

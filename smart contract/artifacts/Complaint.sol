@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Complaint {
+
+contract Complaint is ERC721URIStorage {
     address public officer;
     address public owner;
     uint256 public nextId;
@@ -9,22 +12,7 @@ contract Complaint {
     uint256[] public pendingResolutions;
     uint256[] public resolvedCases;
 
-    struct ComplaintData {
-        string title;
-        string description;
-        string[] evidence;
-        string approvalRemark;
-        string resolutionRemark;
-        bool isApproved;
-        bool isResolved;
-        bool exists;
-    }
-
-    mapping(uint256 => ComplaintData) public Complaints;
-
-    event complaintFiled(uint256 id, address complaintRegisteredBy, string title);
-
-    constructor(address _officer) {
+    constructor(address _officer) ERC721("ComplaintNFT", "CNFT") {
         owner = msg.sender;
         officer = _officer;
         nextId = 1;
@@ -46,32 +34,54 @@ contract Complaint {
         _;
     }
 
-    function fileComplaint(string memory _title, string memory _description)
-        public
-    {
-        ComplaintData storage newComplaint = Complaints[nextId];
-        newComplaint.id = nextId;
+   struct complaint {
+        uint256 id;
+        address complaintRegisteredBy;
+        string title;
+        string description;
+        string ipfsHash; // IPFS hash of the image or file
+        string approvalRemark;
+        string resolutionRemark;
+        bool isApproved;
+        bool isResolved;
+        bool exists;
+    }
+
+    mapping(uint256 => complaint) public Complaints;
+
+    event complaintFiled(
+        uint256 id,
+        address complaintRegisteredBy,
+        string title
+    );
+    event ComplaintFiled(uint256 id, address complaintRegisteredBy, string title, string ipfsHash);
+
+    function fileComplaint(
+        string memory _title,
+        string memory _description,
+        string memory _ipfsHash
+    ) public {
+        uint256 complaintId = nextId++;
+        complaint storage newComplaint = Complaints[complaintId];
+        newComplaint.id = complaintId;
         newComplaint.complaintRegisteredBy = msg.sender;
         newComplaint.title = _title;
         newComplaint.description = _description;
+        newComplaint.ipfsHash = _ipfsHash;
         newComplaint.approvalRemark = "Pending Approval";
         newComplaint.resolutionRemark = "Pending Resolution";
         newComplaint.isApproved = false;
         newComplaint.isResolved = false;
         newComplaint.exists = true;
-        emit complaintFiled(nextId, msg.sender, _title);
-        nextId++;
+
+        // Emit an event for the filed complaint
+        emit ComplaintFiled(complaintId, msg.sender, _title, _ipfsHash);
+
+        // Mint an NFT for the complaint
+        _mint(msg.sender, complaintId);
+        _setTokenURI(complaintId, _ipfsHash);
     }
 
-    function uploadEvidence(uint256 _id, string memory[] calldata _evidence)
-        public
-    {
-        require(
-            Complaints[_id].exists == true,
-            "This complaint id does not exist"
-        );
-        Complaints[_id].evidence.push(_evidence);
-    }
 
     function approveComplaint(uint256 _id, string memory _approvalRemark)
         public
@@ -121,7 +131,49 @@ contract Complaint {
             "Complaint is not yet approved"
         );
         require(
-            Complaints[_id].isResolved == false
-        )
+            Complaints[_id].isResolved == false,
+            "Complaint is already resolved"
+        );
+        Complaints[_id].isResolved = true;
+        Complaints[_id].resolutionRemark = _resolutionRemark;
     }
+
+    function calcPendingApprovalIds() public {
+        delete pendingApprovals;
+        for (uint256 i = 1; i < nextId; i++) {
+            if (
+                Complaints[i].isApproved == false &&
+                Complaints[i].exists == true
+            ) {
+                pendingApprovals.push(Complaints[i].id);
+            }
+        }
+    }
+
+    function calcPendingResolutionIds() public {
+        delete pendingResolutions;
+        for (uint256 i = 1; i < nextId; i++) {
+            if (
+                Complaints[i].isResolved == false &&
+                Complaints[i].isApproved == true &&
+                Complaints[i].exists == true
+            ) {
+                pendingResolutions.push(Complaints[i].id);
+            }
+        }
+    }
+
+    function calcResolvedIds() public {
+        delete resolvedCases;
+        for (uint256 i = 1; i < nextId; i++) {
+            if (Complaints[i].isResolved == true) {
+                resolvedCases.push(Complaints[i].id);
+            }
+        }
+    }
+
+    function setOfficerAddress(address _officer) public onlyOwner {
+        officer = _officer;
+    }
+
 }
